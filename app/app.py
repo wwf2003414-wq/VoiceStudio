@@ -35,6 +35,7 @@ import engine  # noqa: E402
 import languages  # noqa: E402
 import trainer  # noqa: E402
 import dubbing  # noqa: E402
+import social_assets  # noqa: E402
 
 OUT = paths.OUT
 OUT.mkdir(exist_ok=True)
@@ -324,6 +325,39 @@ def _pipeline(spk, task):
 
 def train_download(spk, url):
     yield from _pipeline(spk, trainer.douyin_collect((spk or "").strip(), url))
+
+
+def open_training_profile(spk, url):
+    spk = (spk or "").strip()
+    if not trainer.NAME_RE.match(spk):
+        return "请先填写有效的说话人标识。"
+    try:
+        social_assets.open_profile(trainer.paths(spk)["social_edge"], url)
+    except (OSError, ValueError) as error:
+        return str(error)
+    return "主页已在独立 Edge 窗口打开。内容显示后，回这里点击「收集帖子链接」。"
+
+
+def collect_training_posts(spk, profile, links):
+    spk = (spk or "").strip()
+    if not trainer.NAME_RE.match(spk):
+        return gr.skip(), "请先填写有效的说话人标识。"
+    try:
+        previous = social_assets.post_list(links) if (links or "").strip() else {}
+        visible = social_assets.collect_profile(trainer.paths(spk)["social_edge"], profile)
+        combined = {**previous, **social_assets.post_list("\n".join(visible))}
+    except (OSError, ValueError, RuntimeError) as error:
+        return gr.skip(), str(error)
+    return "\n".join(combined.values()), f"新增 {len(combined) - len(previous)} 条链接。确认后点击「导入素材」。"
+
+
+def train_social_import(spk, links):
+    try:
+        posts = social_assets.post_list(links)
+    except ValueError as error:
+        yield str(error)
+        return
+    yield from _pipeline(spk, trainer.social_import((spk or "").strip(), posts))
 
 
 def train_all(spk, label, files, minutes, lang_choice, epochs, batch, training_engine=dubbing.INDEX):
@@ -669,6 +703,18 @@ def build():
                                     with gr.Row():
                                         t_login = gr.Button("1. 打开登录窗口")
                                         t_dl = gr.Button("2. 开始下载")
+                                with gr.Tab("Instagram / X"):
+                                    t_posts = gr.Textbox(label="帖子或 Reels 链接", lines=4,
+                                                         placeholder="每行一条 Instagram Reels 或 X 视频帖子链接",
+                                                         info="请使用本人或已获授权的素材。导入后和上传素材存放在一起。")
+                                    with gr.Accordion("从主页收集链接", open=False, elem_classes="studio-accordion"):
+                                        t_profile = gr.Textbox(label="Instagram 或 X 主页链接",
+                                                               info="在独立 Edge 窗口打开主页。只收集页面已经显示的帖子链接。")
+                                        with gr.Row():
+                                            t_profile_open = gr.Button("打开主页")
+                                            t_profile_collect = gr.Button("收集帖子链接")
+                                    t_social_go = gr.Button("导入素材", variant="primary")
+                                    t_social_msg = gr.Markdown(elem_classes="studio-generation-status")
                         with gr.Column(elem_classes="studio-card"):
                             card_heading("训练参数")
                             t_engine = gr.Dropdown(trainer.TRAIN_ENGINES, value=dubbing.INDEX, label="训练引擎",
@@ -691,6 +737,10 @@ def build():
                 t_up.click(train_upload, [t_spk, t_files, t_engine], t_msg)
                 t_login.click(train_login, [t_spk, t_url], t_msg)
                 t_dl.click(train_download, [t_spk, t_url], t_msg)
+                t_profile_open.click(open_training_profile, [t_spk, t_profile], t_social_msg, queue=False)
+                t_profile_collect.click(collect_training_posts, [t_spk, t_profile, t_posts], [t_posts, t_social_msg],
+                                        show_progress_on=t_posts)
+                t_social_go.click(train_social_import, [t_spk, t_posts], t_social_msg, show_progress_on=t_social_msg)
                 t_go.click(train_all, [t_spk, t_label, t_files, t_min, t_lang, t_ep, t_bs, t_engine], t_msg).then(
                     refresh_speaker_inputs, None, [spk, h_spk])
 

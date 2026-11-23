@@ -14,6 +14,7 @@ from uuid import uuid4
 import dubbing
 import languages
 import paths as P
+import social_assets
 
 ROOT = P.ROOT
 APP = P.APP
@@ -34,7 +35,7 @@ def paths(spk, revision=None):
     return dict(base=base, work=work, raw=base / "1_原始素材", train=work / "train", refs=work / "refs",
                 clips=work / "3_切片", lst=work / "4_转录.lst", feats=work / "5_特征",
                 lora=P.SPEAKERS_DIR / spk / "model", spkdir=P.SPEAKERS_DIR / spk,
-                log=base / "训练日志.txt", edge=base / "edge_profile")
+                log=base / "训练日志.txt", edge=base / "edge_profile", social_edge=base / "social_edge_profile")
 
 
 def has_audio(d):
@@ -179,6 +180,17 @@ def douyin_collect(spk, url):
     yield from run([PY_VOICE, SKILL / "download.py", "--media", p["base"] / "media.json", "--out", p["raw"],
                     "--profile-url", url], p["log"], "下载视频音频")
     yield from run([PY_VOICE, bc, "close", "--profile-dir", p["edge"]], p["log"], "关闭登录窗口、删除登录数据")
+
+
+def social_import(spk, posts):
+    p = paths(spk)
+    p["base"].mkdir(parents=True, exist_ok=True)
+    yield f"正在导入 {len(posts)} 条链接…"
+    with tempfile.TemporaryDirectory(prefix="social-links-", dir=p["base"]) as temporary:
+        queue = Path(temporary) / "links.txt"
+        queue.write_text("\n".join(posts.values()), encoding="utf-8")
+        yield from run([PY_VOICE, SKILL / "social_assets.py", "--links", queue, "--raw", p["raw"]],
+                       p["log"], "导入 Instagram / X 素材", cwd=SKILL)
 
 
 def step_prepare(p, minutes):
