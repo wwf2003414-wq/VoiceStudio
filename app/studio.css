@@ -1,0 +1,549 @@
+:root {
+    --studio-ink: #211c36;
+    --studio-muted: #655f77;
+    --studio-accent: #6241d8;
+    --studio-border: #e6e1f0;
+    --studio-tint: #f0ebff;
+    --studio-surface: #fff;
+    --studio-canvas: #f6f5fa;
+}
+
+.gradio-container {
+    color-scheme: light;
+    background: var(--studio-canvas) !important;
+}
+
+.gradio-container > main.app {
+    max-width: none;
+    padding: 0 !important;
+}
+
+.gradio-container .wrap > footer {
+    display: none !important;
+}
+
+#studio-masthead {
+    padding: 0 !important;
+    border: 0;
+    border-radius: 0;
+    background: var(--studio-surface);
+}
+
+.column:has(> #studio-masthead) {
+    gap: 0;
+}
+
+.studio-header {
+    min-height: 72px;
+    padding: 0 clamp(18px, 3vw, 44px);
+    border-bottom: 1px solid var(--studio-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.studio-brand,
+.studio-environment {
+    display: flex;
+    gap: 13px;
+    align-items: center;
+}
+
+.brand-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: var(--studio-accent);
+}
+
+.brand-mark i {
+    display: block;
+    height: 12px;
+    width: 2px;
+    border-radius: 3px;
+    background: white;
+}
+
+.brand-mark i:nth-child(2),
+.brand-mark i:nth-child(4) {
+    height: 17px;
+}
+
+.brand-mark i:nth-child(3) {
+    height: 23px;
+}
+
+.studio-brand strong,
+.studio-brand div > span {
+    display: block;
+}
+
+.studio-brand strong {
+    font-size: 17px;
+    font-weight: 750;
+    line-height: 1.2;
+    color: var(--studio-ink);
+}
+
+.studio-brand div > span,
+.studio-local {
+    color: var(--studio-muted);
+    font-size: 12px;
+}
+
+.studio-brand div > span {
+    margin-top: 3px;
+}
+
+.studio-local {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    background: #eaf7ee;
+    color: #246441;
+    white-space: nowrap;
+}
+
+.studio-local::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #35875a;
+}
+
+#studio-navigation {
+    display: grid;
+    grid-template-columns: 214px minmax(0, 1fr);
+    gap: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    min-height: calc(100vh - 72px);
+}
+
+#studio-navigation > .tab-wrapper {
+    display: block;
+    min-width: 0;
+    height: auto;
+    padding: 31px 14px;
+    border: 0;
+    border-right: 1px solid var(--studio-border);
+    background: var(--studio-surface);
+}
+
+#studio-navigation > .tab-wrapper > .visually-hidden {
+    /* Gradio measures this duplicate row to decide which tabs it can show. */
+    flex-direction: column;
+    align-items: flex-start;
+    width: 1px;
+    height: 1px;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] {
+    flex-direction: column;
+    align-items: stretch;
+    overflow: visible;
+    height: auto;
+    gap: 7px;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"]::after,
+#studio-navigation > .tab-wrapper > [role="tablist"] button::after {
+    content: none;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 13px;
+    min-height: 44px;
+    text-align: left;
+    margin: 0;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: var(--studio-muted);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button:hover {
+    background: var(--studio-canvas);
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-selected="true"] {
+    color: #4e30b7;
+    background: var(--studio-tint);
+    border-color: #e8dfff;
+    font-weight: 700;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-tts"]::before,
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-head"]::before,
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-train"]::before,
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-library"]::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    color: inherit;
+    background: currentColor;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-tts"]::before {
+    mask: linear-gradient(#000 0 0) center / 16px 2px no-repeat,
+          linear-gradient(#000 0 0) center top 2px / 16px 2px no-repeat,
+          linear-gradient(#000 0 0) left bottom 2px / 11px 2px no-repeat;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-head"]::before {
+    mask: linear-gradient(#000 0 0) left 1px center / 2px 6px no-repeat,
+          linear-gradient(#000 0 0) left 5px center / 2px 12px no-repeat,
+          linear-gradient(#000 0 0) right 5px center / 2px 16px no-repeat,
+          linear-gradient(#000 0 0) right 1px center / 2px 7px no-repeat;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-train"]::before {
+    mask: linear-gradient(#000 0 0) left 1px bottom 1px / 3px 6px no-repeat,
+          linear-gradient(#000 0 0) center bottom 1px / 3px 10px no-repeat,
+          linear-gradient(#000 0 0) right 1px bottom 1px / 3px 14px no-repeat;
+}
+
+#studio-navigation > .tab-wrapper > [role="tablist"] button[aria-controls="studio-tab-library"]::before {
+    mask: linear-gradient(#000 0 0) left 1px top 1px / 6px 6px no-repeat,
+          linear-gradient(#000 0 0) right 1px top 1px / 6px 6px no-repeat,
+          linear-gradient(#000 0 0) left 1px bottom 1px / 6px 6px no-repeat,
+          linear-gradient(#000 0 0) right 1px bottom 1px / 6px 6px no-repeat;
+}
+
+#studio-navigation > .tabitem {
+    width: 100%;
+    max-width: 1390px;
+    justify-self: center;
+    border: 0;
+    background: transparent;
+    padding: 33px clamp(18px, 3vw, 44px) 40px;
+}
+
+#studio-navigation .page-heading {
+    margin-bottom: 4px;
+}
+
+#studio-navigation .page-heading h1 {
+    color: var(--studio-ink);
+    font-size: clamp(25px, 3vw, 34px);
+    font-weight: 750;
+    line-height: 1.25;
+    margin: 0 0 8px;
+}
+
+#studio-navigation .page-heading p,
+#studio-navigation .card-heading p,
+#studio-navigation .field-note p {
+    margin: 0;
+    color: var(--studio-muted);
+    line-height: 1.65;
+}
+
+#studio-navigation .page-heading p {
+    font-size: 14px;
+}
+
+#studio-navigation .workspace-grid,
+#studio-navigation .workspace-column {
+    align-items: flex-start;
+    gap: 17px;
+}
+
+#studio-navigation .workspace-column {
+    align-items: stretch;
+}
+
+#studio-navigation .studio-card {
+    container-type: inline-size;
+    border: 1px solid var(--studio-border);
+    border-radius: 15px;
+    padding: 18px;
+    gap: 12px;
+    min-width: 0 !important;
+    background: var(--studio-surface);
+    box-shadow: 0 2px 6px #26175207;
+}
+
+#studio-navigation .form {
+    background: transparent;
+    overflow: visible;
+}
+
+#studio-navigation .script-card > .form,
+#studio-navigation .settings-row > .form {
+    gap: 12px;
+}
+
+#studio-navigation .settings-row > .form > .block {
+    min-width: min(190px, 100%) !important;
+}
+
+#studio-navigation .card-heading h2 {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.4;
+    font-weight: 750;
+    color: var(--studio-ink);
+}
+
+#studio-navigation .card-heading p {
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+#studio-navigation .field-note p {
+    font-size: 11px;
+}
+
+#studio-navigation .field-note code,
+#studio-navigation .studio-status code {
+    overflow-wrap: anywhere;
+}
+
+#studio-navigation .studio-status.block:not(:has(p, ul, ol, pre, table)) {
+    display: none;
+}
+
+#studio-navigation .studio-status p {
+    margin: 0;
+}
+
+#studio-navigation .studio-generation-status.block {
+    min-height: 44px;
+    font-size: 13px;
+    color: var(--studio-ink);
+    overflow-wrap: anywhere;
+}
+
+#studio-navigation .studio-generation-status p {
+    margin: 0;
+}
+
+#studio-navigation .studio-generation-status a {
+    color: var(--studio-accent);
+    font-weight: 650;
+    text-decoration: underline;
+}
+
+#studio-script textarea,
+#studio-navigation .script-input textarea {
+    padding: 13px 14px;
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+#studio-script textarea {
+    min-height: 192px;
+}
+
+#studio-navigation .script-language {
+    max-width: 230px;
+    margin-inline: 0 auto;
+}
+
+#studio-navigation .reference-audio {
+    min-height: 98px;
+    padding: 9px 10px 0;
+    border: 1px dashed #d8ccef;
+    border-radius: 9px;
+    background: #faf9fd;
+}
+
+#studio-navigation .reference-audio .audio-container {
+    height: auto;
+}
+
+#studio-navigation .result-audio {
+    min-height: 69px;
+    background: #faf9fd;
+    border: 1px solid var(--studio-border);
+    border-radius: 9px;
+}
+
+#studio-navigation .model-results {
+    gap: 12px;
+}
+
+#studio-navigation .result-audio .empty {
+    min-height: 0;
+    height: 67px;
+    margin: 0;
+}
+
+#studio-navigation .reference-audio .audio-container > .boundedheight,
+#studio-navigation .training-upload .boundedheight {
+    height: 118px !important;
+    min-height: 0;
+}
+
+#studio-navigation .training-upload {
+    border: 1px dashed #d8ccef;
+    border-radius: 9px;
+    background: #faf9fd;
+    padding: 10px;
+}
+
+#studio-navigation .settings-row {
+    gap: 12px;
+}
+
+#studio-navigation .field-action,
+#studio-navigation .action-row {
+    align-items: center;
+    gap: 10px;
+}
+
+#studio-navigation .field-action {
+    align-items: flex-end;
+}
+
+#studio-navigation .field-action > .block {
+    min-width: min(145px, 100%) !important;
+}
+
+#studio-navigation .action-row {
+    padding-top: 10px;
+    border-top: 1px solid var(--studio-border);
+}
+
+#studio-navigation .action-row > .block {
+    flex: 1 1 160px !important;
+    min-width: min(160px, 100%) !important;
+}
+
+#studio-navigation .action-row > button,
+#studio-navigation .field-action > button,
+#studio-navigation .library-actions > button {
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
+}
+
+#studio-navigation .action-row > button {
+    min-height: 42px;
+    min-width: 136px;
+    padding-inline: 16px;
+    box-shadow: 0 2px 5px #6241d833;
+}
+
+#studio-navigation .field-action > button {
+    margin-bottom: 2px;
+}
+
+#studio-navigation .studio-accordion {
+    border: 1px solid var(--studio-border);
+    border-radius: 9px;
+    background: #faf9fd;
+}
+
+#studio-navigation .studio-accordion > .label-wrap {
+    padding: 9px 10px;
+}
+
+#studio-navigation .studio-accordion > .label-wrap ~ * {
+    padding: 0 10px 10px;
+}
+
+#studio-navigation .inner-tabs .tabitem {
+    border: 0;
+}
+
+#studio-navigation button:focus-visible,
+#studio-navigation input[role="listbox"]:focus-visible,
+#studio-navigation textarea:focus-visible {
+    outline: 2px solid var(--studio-accent);
+    outline-offset: 2px;
+}
+
+@media (max-width: 1000px) {
+    .studio-header {
+        min-height: 62px;
+    }
+
+    #studio-navigation {
+        display: block;
+        min-height: calc(100vh - 62px);
+    }
+
+    #studio-navigation > .tab-wrapper {
+        padding: 8px 12px;
+        border-right: 0;
+        border-bottom: 1px solid var(--studio-border);
+    }
+
+    #studio-navigation > .tab-wrapper > [role="tablist"] {
+        flex-flow: row wrap;
+    }
+
+    #studio-navigation > .tab-wrapper > [role="tablist"] button {
+        padding: 9px 10px;
+        min-height: 38px;
+        font-size: 12px;
+        gap: 6px;
+    }
+
+    #studio-navigation > .tabitem {
+        padding: 23px clamp(13px, 3vw, 28px) 30px;
+    }
+}
+
+@media (max-width: 760px) {
+    #studio-navigation > .tabitem {
+        padding-inline: 13px;
+    }
+
+    #studio-navigation .workspace-grid {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #studio-navigation .studio-card {
+        padding: 14px;
+    }
+
+    #studio-script textarea {
+        min-height: 156px;
+    }
+}
+
+@container (max-width: 400px) {
+    #studio-navigation .settings-row > .form {
+        flex-direction: column;
+    }
+
+    #studio-navigation .settings-row > .form > .block {
+        width: 100%;
+    }
+
+    #studio-navigation .action-row > button {
+        flex-basis: 100%;
+    }
+}
+
+@media (max-width: 430px) {
+    #studio-navigation > .tab-wrapper > [role="tablist"] button::before {
+        display: none;
+    }
+
+    #studio-navigation > .tab-wrapper > [role="tablist"] {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+}

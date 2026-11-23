@@ -4,7 +4,9 @@ cd /d "%~dp0"
 chcp 65001 >nul
 set "PYTHONUTF8=1"
 set "PYTHONNOUSERSITE=1"
-set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
+if exist "%~dp0fengstudio.local.cmd" call "%~dp0fengstudio.local.cmd"
+set "PYTHON_EXE=%FENGSTUDIO_PYTHON%"
+if not defined PYTHON_EXE set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
 if not exist "%PYTHON_EXE%" set "PYTHON_EXE=%~dp0python\python.exe"
 if not exist "%PYTHON_EXE%" (
     echo Python environment missing. Run setup.bat first.

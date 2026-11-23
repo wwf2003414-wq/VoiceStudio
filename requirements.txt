@@ -13,6 +13,7 @@ imageio-ffmpeg==0.8.1
 jaconv==0.5.0
 jieba==0.42.1
 json5==0.10.0
+langid==1.1.6
 librosa==0.10.2.post1
 modelscope==1.27.0
 munch==4.0.0

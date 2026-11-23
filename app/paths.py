@@ -8,15 +8,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / "app"
-IX = ROOT / "engine" / "index-tts"
+DATA = Path(os.environ.get("FENGSTUDIO_DATA", ROOT)).expanduser().resolve()
+IX = DATA / "engine" / "index-tts"
 CKPT = IX / "checkpoints"
 HF_CACHE = CKPT / "hf_cache"          # w2v-bert、bigvgan、HTDemucs 都在这里
 TOOLS = ROOT / "tools"
-SPEAKERS_DIR = ROOT / "speakers"
-SPEAKERS_JSON = APP / "speakers.json"
-OUT = ROOT / "output"
-TRAIN = ROOT / "train"
-MODELS = ROOT / "models"              # whisper 等
+SPEAKERS_DIR = DATA / "speakers"
+SPEAKERS_JSON = DATA / "app" / "speakers.json"
+OUT = DATA / "output"
+TRAIN = DATA / "train"
+MODELS = DATA / "models"              # whisper 等
 PY = Path(sys.executable)
 
 FUNASR = dict(model=CKPT / "paraformer-zh", vad_model=CKPT / "fsmn-vad", punc_model=CKPT / "ct-punc")
@@ -49,7 +50,7 @@ def env_vars():
         "PYTHONIOENCODING": "utf-8",
         "PYTHONUTF8": "1",
         "PYTHONNOUSERSITE": "1",
-        "VOICE_STUDIO_ROOT": str(ROOT),
+        "VOICE_STUDIO_ROOT": str(DATA),
     }
 
 
@@ -76,7 +77,7 @@ def to_rel(p):
         return ""
     p = Path(p)
     try:
-        return p.resolve().relative_to(ROOT).as_posix()
+        return p.resolve().relative_to(DATA).as_posix()
     except ValueError:
         return str(p)
 
@@ -85,14 +86,13 @@ def to_abs(p):
     if not p:
         return ""
     p = Path(p)
-    return str(p if p.is_absolute() else (ROOT / p))
+    return str(p if p.is_absolute() else (DATA / p))
 
 
 def path_problem():
     """返回路径问题说明；没问题返回 None。"""
-    s = str(ROOT)
-    if not s.isascii():
-        return f"这个文件夹的路径里有中文或特殊字符：{s}\n请把整个文件夹放到纯英文路径下，例如 D:\\VoiceStudio，再重新启动。"
-    if " " in s:
-        return f"路径里有空格：{s}\n建议放到没有空格的路径，例如 D:\\VoiceStudio。"
+    for folder in (ROOT, DATA):
+        s = str(folder)
+        if not s.isascii() or " " in s:
+            return f"工作目录需要英文且无空格：{s}\n例如 D:\\FengStudio。"
     return None

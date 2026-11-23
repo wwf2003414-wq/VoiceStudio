@@ -1,4 +1,8 @@
 /.venv/
+/.auk-venv/
+/.qwen-venv/
+/.omni-venv/
+/fengstudio.local.cmd
 /python/
 /models/
 /engine/index-tts/checkpoints/

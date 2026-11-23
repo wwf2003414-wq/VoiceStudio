@@ -13,9 +13,11 @@
 """
 import argparse
 import glob
+import hashlib
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import librosa
@@ -26,17 +28,45 @@ SR = 24000
 
 def separate(raw_dir, sep_dir):
     import torch
-    todo = [f for f in sorted(glob.glob(os.path.join(raw_dir, "*.wav")))
-            if not os.path.exists(os.path.join(sep_dir, "htdemucs_ft", os.path.basename(f)[:-4] + "_vocals.wav"))]
-    if todo:
-        print(f"去伴奏 {len(todo)} 条…", flush=True)
+    todo = []
+    for source in sorted(Path(raw_dir).glob("*.wav")):
+        vocal = Path(sep_dir) / "htdemucs_ft" / f"{source.stem}_vocals.wav"
+        try:
+            complete = vocal.is_file() and sf.info(vocal).duration >= sf.info(source).duration - 0.1
+        except RuntimeError:
+            complete = False
+        if not complete:
+            todo.append(str(source))
+    for offset in range(0, len(todo), 10):
+        print(f"去伴奏 {offset + 1}–{min(len(todo), offset + 10)} / {len(todo)}…", flush=True)
         subprocess.run([sys.executable, "-m", "demucs", "-n", "htdemucs_ft", "--two-stems=vocals",
                         "-d", "cuda" if torch.cuda.is_available() else "cpu", "-o", sep_dir,
-                        "--filename", "{track}_{stem}.{ext}", *todo], check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        "--filename", "{track}_{stem}.{ext}", *todo[offset:offset + 10]], check=True)
     for f in glob.glob(os.path.join(sep_dir, "htdemucs_ft", "*_no_vocals.wav")):
         os.remove(f)
     return sorted(glob.glob(os.path.join(sep_dir, "htdemucs_ft", "*_vocals.wav")))
+
+
+def convert_media(raw, workspace):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
+    from trainer import media_files
+
+    folder = Path(workspace) / "converted"
+    folder.mkdir(parents=True, exist_ok=True)
+    for source in media_files(raw):
+        identity = hashlib.sha256(source.name.encode("utf-8")).hexdigest()[:12]
+        target = folder / f"{source.stem[:64]}_{identity}.wav"
+        if target.is_file():
+            continue
+        pending = target.with_suffix(".tmp.wav")
+        result = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                                 "-i", str(source), "-vn", "-ac", "1", "-ar", "44100", str(pending)],
+                                capture_output=True, text=True, errors="replace")
+        if result.returncode:
+            pending.unlink(missing_ok=True)
+            raise RuntimeError(f"无法读取训练素材 {source.name}：{result.stderr.strip()}")
+        pending.replace(target)
+    return str(folder)
 
 
 def mfcc_mean(y):
@@ -52,7 +82,10 @@ def select(vocal_files, ref_files, out_dir, minutes):
     rows = []
     for f in vocal_files:
         y, _ = librosa.load(f, sr=SR, mono=True)
-        rows.append({"f": f, "y": y, "floor": noise_floor(y), "m": mfcc_mean(y)})
+        if len(y) >= 2 * SR:
+            rows.append({"f": f, "floor": noise_floor(y[:SR * 120]), "m": mfcc_mean(y)})
+    if not rows:
+        raise RuntimeError("没有解码出有效人声，请上传至少包含两秒人声的音频或视频。")
     if ref_files:
         target = np.mean([mfcc_mean(librosa.load(r, sr=SR, mono=True)[0]) for r in ref_files], axis=0)
     else:
@@ -72,7 +105,12 @@ def select(vocal_files, ref_files, out_dir, minutes):
         print(f"{'KEEP' if keep else 'skip'} {name:32s} 底噪 {r['floor']:6.1f} dB  音色距离 {r['dist']:5.1f}"
               f"{'  (偏离本人，排除)' if r['dist'] > cap else ''}")
         if keep:
-            y = r["y"][2 * SR: -2 * SR]  # 去片头片尾的音效
+            margin = 2 if sf.info(r["f"]).duration > 12 else 0
+            remaining = max(0, minutes * 60 - total)
+            y, _ = librosa.load(r["f"], sr=SR, mono=True, offset=margin,
+                                duration=min(remaining, sf.info(r["f"]).duration - 2 * margin))
+            if len(y) < 2 * SR:
+                continue
             sf.write(os.path.join(out_dir, name), (y / (np.abs(y).max() + 1e-9) * 0.89).astype(np.float32), SR, subtype="PCM_16")
             total += len(y) / SR
     print(f"训练集 {total / 60:.1f} 分钟 -> {out_dir}（音色距离上限 {cap:.1f}）")
@@ -141,7 +179,7 @@ def main():
     ap.add_argument("--minutes", type=float, default=60)
     ap.add_argument("--refs", default="", help="可选：用分号分隔的本人干净片段，用来判断哪些是本人")
     a = ap.parse_args()
-    vocals = separate(a.raw, os.path.join(a.work, "sep"))
+    vocals = separate(convert_media(a.raw, a.work), os.path.join(a.work, "sep"))
     select(vocals, [r for r in a.refs.split(";") if r], os.path.join(a.work, "train"), a.minutes)
     cut_refs(os.path.join(a.work, "train"), os.path.join(a.work, "refs"))
 

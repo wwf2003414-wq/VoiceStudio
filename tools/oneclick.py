@@ -168,7 +168,7 @@ def _local_funasr():
             return {k: str(v) for k, v in d.items()}
     return {"model": "paraformer-zh", "vad_model": "fsmn-vad", "punc_model": "ct-punc"}
 
-def transcribe(vocals):
+def transcribe(vocals, language_codes=WHISPER_TO_WB, checkpoint="turbo"):
     """返回 (工作台语言代码, 断句 [(start, end, text)], 中文逐字 [(start, 字)] 或 None)
 
     中文：断句时间用 FunASR（句子边界准），文字用 Whisper（不容易出现"升升已已经"这种重复乱码），
@@ -177,15 +177,15 @@ def transcribe(vocals):
     import torch
     import whisper
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    m = whisper.load_model("turbo", device=dev)
+    m = whisper.load_model(checkpoint, device=dev)
     a = whisper.pad_or_trim(whisper.load_audio(str(vocals)))
     mel = whisper.log_mel_spectrogram(a, n_mels=m.dims.n_mels).to(m.device)
     _, probs = m.detect_language(mel)
     code = max(probs, key=probs.get)
-    lang = WHISPER_TO_WB.get(code)
+    lang = language_codes.get(code)
     if not lang:
-        raise SystemExit(f"识别到的语言是 {code}，工作台不支持（只支持中/英/日/西/阿）。")
-    say(f"识别到语言：{LANG_NAME[lang]}")
+        raise SystemExit(f"识别到的语言是 {code}，当前工作流不支持。")
+    say(f"识别到语言：{LANG_NAME.get(lang, code)}")
     if lang != "ZH":
         r = m.transcribe(str(vocals), language=code, condition_on_previous_text=False)
         return lang, [(s["start"], s["end"], s["text"].strip()) for s in r["segments"]], None

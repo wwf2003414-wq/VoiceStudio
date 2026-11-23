@@ -13,13 +13,13 @@ prep 输出 工作目录/prep.json：
 """
 import argparse
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import paths  # noqa: E402
+from languages import WHISPER_CODES  # noqa: E402
 
 paths.setup_env()
 import oneclick as oc  # noqa: E402
@@ -41,7 +41,9 @@ def cmd_prep(a):
     text, lang = "", None
     if a.mode == "auto":
         print("识别语言并转写…", flush=True)
-        lang, sents, words = oc.transcribe(vocals)
+        lang, sents, words = oc.transcribe(
+            vocals, WHISPER_CODES, str(paths.MODELS / "whisper" / "large-v3-turbo.pt"),
+        )
         if not sents:
             raise SystemExit("没有识别出任何说话内容。")
         cut, idx = oc.find_cut(vocals, sents, a.cut)

@@ -19,7 +19,7 @@ def line(good, msg, fix=""):
 
 
 print("=" * 60)
-print("  本地配音工作室 · 环境检查")
+print("  FengStudio · 环境检查")
 print("=" * 60)
 print(f"文件夹：{paths.ROOT}\n")
 
@@ -86,5 +86,5 @@ for mod in ("indextts", "gradio", "funasr", "whisper", "demucs", "librosa", "pef
 edge = Path(os.environ.get("ProgramFiles(x86)", r"C:/Program Files (x86)")) / "Microsoft/Edge/Application/msedge.exe"
 print("  [可选] Microsoft Edge " + ("已安装" if edge.exists() else "未找到，可从网页上传训练素材"))
 
-print("\n" + ("✅ 全部通过，可以双击「启动本地配音工作室.bat」。" if ok else "❌ 有问题，按上面的提示处理后再运行本检查。"))
+print("\n" + ("✅ 全部通过，可以双击「启动 FengStudio.bat」。" if ok else "❌ 有问题，按上面的提示处理后再运行本检查。"))
 sys.exit(0 if ok else 1)
