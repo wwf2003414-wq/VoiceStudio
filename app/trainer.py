@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,10 +24,44 @@ PY_IX = sys.executable    # 便携版只有一个 Python 环境，所有步骤�
 PY_VOICE = sys.executable
 SKILL = P.TOOLS
 SPEAKERS = P.SPEAKERS_JSON
-NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{1,30}$")
+NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,30}")
+RESERVED_NAMES = re.compile(r"(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])")
 AUDIO_EXTS = (".wav", ".mp3", ".m4a", ".flac", ".aac", ".ogg", ".mp4", ".mov", ".mkv")
 TRAIN_HELPERS = {dubbing.QWEN: "train_qwen.py", dubbing.OMNI: "train_omni.py"}
 TRAIN_ENGINES = (dubbing.INDEX, *TRAIN_HELPERS)
+
+
+def resolve_speaker(value):
+    name = unicodedata.normalize("NFC", (value or "").strip())
+    if not name:
+        raise ValueError("请先填写上方的「说话人名称」，例如「小李」。")
+
+    profiles = {key: profile for key, profile in _load_raw().items()
+                if NAME_RE.fullmatch(key) and not RESERVED_NAMES.fullmatch(key)}
+    normalized = name.casefold()
+    for key, profile in profiles.items():
+        if key.casefold() == normalized:
+            return key, profile.get("label") or name
+
+    matching = [(key, profile["label"]) for key, profile in profiles.items()
+                if (profile.get("label") or "").strip().casefold() == normalized]
+    if len(matching) == 1:
+        return matching[0]
+    if len(matching) > 1:
+        raise ValueError("有多个同名说话人。请填写「说话人和历史」里对应的说话人标识。")
+
+    if (len(name) > 40 or not any(char.isalnum() for char in name)
+            or any(not char.isalnum() and char not in " _-" for char in name)):
+        raise ValueError("「说话人名称」支持 1–40 个文字、数字、空格、下划线或连字符。")
+    if NAME_RE.fullmatch(name) and not RESERVED_NAMES.fullmatch(name):
+        if P.TRAIN.is_dir():
+            for folder in P.TRAIN.iterdir():
+                if folder.name.casefold() == normalized and folder.is_dir():
+                    return folder.name, name
+        return normalized, name
+
+    key = "speaker_" + hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:20]
+    return key, profiles.get(key, {}).get("label") or name
 
 
 def paths(spk, revision=None):
@@ -86,18 +121,17 @@ def status(spk, engine=dubbing.INDEX):
     return {**common, "LoRA训练": trained}
 
 
-def status_md(spk, engine=dubbing.INDEX):
-    if not spk or not NAME_RE.match(spk):
-        return "先填一个说话人名字（英文字母开头，可含数字和下划线，例如 `xiaoli`）。"
+def status_md(spk, engine=dubbing.INDEX, name=None):
+    profile = load_speakers().get(spk, {})
     st = status(spk, engine)
-    rows = [f"**{spk} · {engine}**"]
+    rows = [f"**{profile.get('label') or name or spk} · {engine}**"]
     for k, v in st.items():
         rows.append(f"{'✅' if v else '⬜'} {k}")
     n_raw = len(media_files(paths(spk)["raw"]))
     if n_raw:
         rows.append(f"\n素材文件 {n_raw} 个，位置：`{paths(spk)['raw']}`")
     if st["LoRA训练"]:
-        lora = load_speakers().get(spk, {}).get("adapters", {}).get(engine) or paths(spk)["lora"]
+        lora = profile.get("adapters", {}).get(engine) or paths(spk)["lora"]
         rows.append(f"\n🎉 已训练好，模型在 `{lora}`，到「文本配音」页刷新说话人就能选。")
     return "\n\n".join(rows)
 

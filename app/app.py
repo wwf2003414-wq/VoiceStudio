@@ -285,66 +285,71 @@ def tab_head_gen(selection, transcript, work, text, lang_choice, spk, emo_method
 
 # ------------------------------------------------------------- 训练 --
 def train_status(spk, training_engine=dubbing.INDEX):
-    return trainer.status_md((spk or "").strip(), training_engine)
+    try:
+        key, name = trainer.resolve_speaker(spk)
+    except ValueError as error:
+        return str(error)
+    return trainer.status_md(key, training_engine, name)
 
 
 def train_upload(spk, files, training_engine=dubbing.INDEX):
-    spk = (spk or "").strip()
-    if not trainer.NAME_RE.match(spk):
-        raise gr.Error("名字不合法：英文字母开头，可含数字和下划线")
+    try:
+        key, name = trainer.resolve_speaker(spk)
+    except ValueError as error:
+        return str(error)
     with generation_slot():
-        n = trainer.save_uploads(spk, files)
+        n = trainer.save_uploads(key, files)
     note = f"已保存 {n} 个新素材文件。" if n else "没有新增素材。已导入的同名同内容文件会自动跳过。"
-    return note + "\n\n" + trainer.status_md(spk, training_engine)
+    return note + "\n\n" + trainer.status_md(key, training_engine, name)
 
 
 def train_login(spk, url):
-    spk = (spk or "").strip()
-    if not trainer.NAME_RE.match(spk):
-        raise gr.Error("名字不合法")
+    try:
+        key, _ = trainer.resolve_speaker(spk)
+    except ValueError as error:
+        return str(error)
     if "douyin.com" not in (url or ""):
-        raise gr.Error("请粘贴抖音主页链接（https://www.douyin.com/user/...，或 App 里复制的 v.douyin.com 短链接）")
-    trainer.douyin_login(spk, url)
+        return "请粘贴抖音主页链接（https://www.douyin.com/user/...，或抖音 App 复制的主页短链接）。"
+    trainer.douyin_login(key, url)
     return "已打开一个单独的 Edge 窗口，请在里面**扫码登录抖音**，登录好后点「2. 开始下载」。"
 
 
 def _pipeline(spk, task):
-    spk = (spk or "").strip()
-    if not trainer.NAME_RE.match(spk):
-        raise gr.Error("名字不合法")
+    try:
+        key, name = trainer.resolve_speaker(spk)
+    except ValueError as error:
+        yield str(error)
+        return
     if not GPU_LOCK.acquire(blocking=False):
-        raise gr.Error("显卡正在生成或训练别的任务，请等它结束")
+        yield "显卡正在处理另一项任务，请等它结束再试。"
+        return
     try:
         ENG.unload()
-        yield from task
+        yield from task(key, name)
     except Exception as e:
-        yield f"❌ {e}\n\n" + trainer.tail(trainer.paths(spk)["log"])
+        yield f"❌ {e}\n\n" + trainer.tail(trainer.paths(key)["log"])
     finally:
         GPU_LOCK.release()
 
 
 def train_download(spk, url):
-    yield from _pipeline(spk, trainer.douyin_collect((spk or "").strip(), url))
+    yield from _pipeline(spk, lambda key, _: trainer.douyin_collect(key, url))
 
 
 def open_training_profile(spk, url):
-    spk = (spk or "").strip()
-    if not trainer.NAME_RE.match(spk):
-        return "请先填写有效的说话人标识。"
     try:
-        social_assets.open_profile(trainer.paths(spk)["social_edge"], url)
+        key, _ = trainer.resolve_speaker(spk)
+        social_assets.open_profile(trainer.paths(key)["social_edge"], url)
     except (OSError, ValueError) as error:
         return str(error)
     return "主页已在独立 Edge 窗口打开。内容显示后，回这里点击「收集帖子链接」。"
 
 
 def collect_training_posts(spk, profile, links):
-    spk = (spk or "").strip()
-    if not trainer.NAME_RE.match(spk):
-        return gr.skip(), "请先填写有效的说话人标识。"
     try:
+        key, _ = trainer.resolve_speaker(spk)
         previous = social_assets.post_list(links) if (links or "").strip() else {}
-        visible = social_assets.collect_profile(trainer.paths(spk)["social_edge"], profile)
+        visible = social_assets.collect_profile(trainer.paths(key)["social_edge"], profile)
         combined = {**previous, **social_assets.post_list("\n".join(visible))}
     except (OSError, ValueError, RuntimeError) as error:
         return gr.skip(), str(error)
@@ -352,26 +357,28 @@ def collect_training_posts(spk, profile, links):
 
 
 def train_social_import(spk, links):
-    try:
-        posts = social_assets.post_list(links)
-    except ValueError as error:
-        yield str(error)
-        return
-    yield from _pipeline(spk, trainer.social_import((spk or "").strip(), posts))
+    def run(key, _):
+        try:
+            posts = social_assets.post_list(links)
+        except ValueError as error:
+            yield str(error)
+            return
+        yield from trainer.social_import(key, posts)
+
+    yield from _pipeline(spk, run)
 
 
 def train_all(spk, label, files, minutes, lang_choice, epochs, batch, training_engine=dubbing.INDEX):
-    spk = (spk or "").strip()
     lang = languages.CHOICES.get(lang_choice)
 
-    def train():
-        trainer.save_uploads(spk, files)
-        if not trainer.has_audio(trainer.paths(spk)["raw"]):
-            raise ValueError("还没有素材。请上传同一说话人的音频或视频。")
-        yield from trainer.train_speaker(spk, (label or "").strip(), minutes, lang, epochs, batch, training_engine)
-        yield f"{training_engine} LoRA 已登记。配音时选择这个引擎和说话人即可使用。\n\n" + trainer.status_md(spk, training_engine)
+    def train(key, name):
+        trainer.save_uploads(key, files)
+        if not trainer.has_audio(trainer.paths(key)["raw"]):
+            raise ValueError("当前说话人还没有素材。请先上传音视频或从社交媒体导入。")
+        yield from trainer.train_speaker(key, (label or "").strip() or name, minutes, lang, epochs, batch, training_engine)
+        yield f"{training_engine} LoRA 已登记。配音时选择这个引擎和说话人即可使用。\n\n" + trainer.status_md(key, training_engine, name)
 
-    yield from _pipeline(spk, train())
+    yield from _pipeline(spk, train)
 
 
 # ------------------------------------------------------------- 管理 --
@@ -690,19 +697,22 @@ def build():
                         with gr.Column(elem_classes="studio-card"):
                             card_heading("说话人与素材", "建议准备至少 30 分钟的人声素材，60 分钟更合适。")
                             with gr.Row(elem_classes="settings-row"):
-                                t_spk = gr.Textbox(label="说话人标识", placeholder="英文或拼音，例如 xiaoli")
-                                t_label = gr.Textbox(label="显示名（可选）", placeholder="例如 小李")
+                                t_spk = gr.Textbox(label="说话人名称", placeholder="例如 小李",
+                                                   info="支持中文和英文。已有说话人也可填写原标识。")
+                                t_label = gr.Textbox(label="配音显示名（可选）", placeholder="默认使用说话人名称")
                             with gr.Tabs(elem_classes="inner-tabs"):
                                 with gr.Tab("上传历史素材"):
                                     t_files = gr.File(label="音频或视频（可多选）", file_count="multiple",
                                                       file_types=list(trainer.AUDIO_EXTS),
                                                       elem_classes="training-upload")
                                     t_up = gr.Button("仅保存素材")
+                                    t_upload_msg = gr.Markdown(elem_classes="studio-status")
                                 with gr.Tab("抖音主页"):
                                     t_url = gr.Textbox(label="抖音主页链接")
                                     with gr.Row():
                                         t_login = gr.Button("1. 打开登录窗口")
                                         t_dl = gr.Button("2. 开始下载")
+                                    t_douyin_msg = gr.Markdown(elem_classes="studio-generation-status")
                                 with gr.Tab("Instagram / X"):
                                     t_posts = gr.Textbox(label="帖子或 Reels 链接", lines=4,
                                                          placeholder="每行一条 Instagram Reels 或 X 视频帖子链接",
@@ -728,15 +738,15 @@ def build():
                             t_go = gr.Button("保存素材并开始 LoRA 训练", variant="primary")
                     with gr.Column(scale=5, min_width=290, elem_classes="workspace-column"):
                         with gr.Column(elem_classes="studio-card"):
-                            card_heading("训练进度", "训练会独占显卡，耗时取决于素材和引擎。可按说话人标识和引擎查询。")
+                            card_heading("训练进度", "训练会独占显卡，耗时取决于素材和引擎。可按说话人名称和引擎查询。")
                             t_check = gr.Button("查看进度")
                             t_msg = gr.Markdown(elem_classes="studio-status")
 
                 t_engine.change(training_engine_fields, [t_engine, t_lang], [t_lang, t_bs], queue=False)
                 t_check.click(train_status, [t_spk, t_engine], t_msg, queue=False)
-                t_up.click(train_upload, [t_spk, t_files, t_engine], t_msg)
-                t_login.click(train_login, [t_spk, t_url], t_msg)
-                t_dl.click(train_download, [t_spk, t_url], t_msg)
+                t_up.click(train_upload, [t_spk, t_files, t_engine], t_upload_msg)
+                t_login.click(train_login, [t_spk, t_url], t_douyin_msg, show_progress_on=t_douyin_msg)
+                t_dl.click(train_download, [t_spk, t_url], t_douyin_msg, show_progress_on=t_douyin_msg)
                 t_profile_open.click(open_training_profile, [t_spk, t_profile], t_social_msg, queue=False)
                 t_profile_collect.click(collect_training_posts, [t_spk, t_profile, t_posts], [t_posts, t_social_msg],
                                         show_progress_on=t_posts)
