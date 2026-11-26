@@ -6,13 +6,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import paths  # noqa: E402
 
-bat = paths.ROOT / "启动本地配音工作室.bat"
+bat = paths.ROOT / "启动 FengStudio.bat"
 ps = (
     "$d=[Environment]::GetFolderPath('Desktop');"
-    "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d '本地配音工作室.lnk'));"
+    "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'FengStudio.lnk'));"
     f"$s.TargetPath='{bat}';$s.WorkingDirectory='{paths.ROOT}';"
     "$s.IconLocation=\"$env:SystemRoot\\System32\\SHELL32.dll,168\";$s.Save();"
-    "Write-Output (Join-Path $d '本地配音工作室.lnk')"
+    "Write-Output (Join-Path $d 'FengStudio.lnk')"
 )
 r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, encoding="utf-8",
                    errors="replace")
