@@ -53,6 +53,7 @@ uv pip install --python .omni-venv/Scripts/python.exe 'omnivoice[lora]==0.2.1'
 | `FENGSTUDIO_DATA` | 复用旧工作室的引擎、权重、说话人、素材和历史 | 当前项目目录 |
 | `FENGSTUDIO_PYTHON` | 复用已有的 IndexTTS Python 环境 | `.venv\Scripts\python.exe` 或 `python\python.exe` |
 | `FENGSTUDIO_PORT` | 启动端口 | `7860` |
+| `FENG_INDEX_HISTORY` | 可选的旧版 IndexTTS 生成目录，配置后可在文本配音页载入旧版最后一条 WAV 的原文和参数 | 留空 |
 | `FENG_QWEN_PYTHON` | 已安装 `qwen-tts`、PyTorch、`soundfile` 的环境 | `.qwen-venv\Scripts\python.exe` |
 | `FENG_QWEN_MODEL` | 完整的 Qwen3-TTS 1.7B Base 本机快照，含 `speech_tokenizer` | 数据目录下的 `models/Qwen3-TTS-12Hz-1.7B-Base` |
 | `FENG_QWEN_DEVICE` | Qwen3-TTS 推理设备 | `cuda:0` |

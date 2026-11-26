@@ -2,9 +2,11 @@
 
   启动：双击文件夹里的「启动本地配音工作室.bat」，浏览器打开 http://127.0.0.1:7860
 """
+import hashlib
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -45,6 +47,7 @@ GPU_LOCK = threading.Lock()  # 生成和训练不能同时占显卡
 
 AUTO_LANGUAGE = "自动识别"
 EMO_CHOICES = [engine.EMO_SAME, engine.EMO_REF]
+INDEX_HISTORY = os.environ.get("FENG_INDEX_HISTORY")
 
 
 # ------------------------------------------------------------------ 公共 --
@@ -215,7 +218,11 @@ def tab_tts(selection, transcript, text, lang_choice, spk, ref, emo_method, emo_
             progress=gr.Progress()):
     lang = resolve_lang(lang_choice, text or "")
     saved_ref, adapters = speaker_reference(spk)
-    ref = ref or saved_ref
+    uses_index = selection in (dubbing.INDEX, dubbing.COMPARE) or (
+        selection == dubbing.AUTO and dubbing.preferred_model(lang) == dubbing.INDEX
+    )
+    if not uses_index:
+        ref = ref or saved_ref
     index_settings = dict(emo_method=emo_method, emo_ref=emo_ref, emo_weight=emo_weight, temperature=temperature,
                           top_p=top_p, top_k=top_k, num_beams=num_beams, repetition_penalty=rep_pen,
                           diffusion_steps=steps, max_text_tokens=max_tokens)
@@ -228,11 +235,75 @@ def tab_tts(selection, transcript, text, lang_choice, spk, ref, emo_method, emo_
                       speed=speed, pause_ms=pause_ms, **info)
         if model == dubbing.INDEX:
             params.update(index_settings)
+            params["lora"] = adapters.get(model)
+            try:
+                params["ref_seconds"] = round(sf.info(ref).duration, 2)
+            except (OSError, RuntimeError):
+                pass
         dubbing.write_json(path.with_suffix(".json"), params)
-        return str(path), str(path), f"{info['seconds']} 秒音频，耗时 {info['gen_seconds']} 秒。"
+        detail = f"{info['seconds']} 秒音频，耗时 {info['gen_seconds']} 秒。"
+        if model == dubbing.INDEX:
+            duration = f" {params['ref_seconds']} 秒" if "ref_seconds" in params else ""
+            detail += f"\n\n音色参考{duration} · {emo_method} · 句间停顿 {pause_ms:g} ms"
+            if not params["lora"]:
+                detail += " · 零样本克隆"
+        return str(path), str(path), detail
 
     return generate_versions(selection, text, lang, ref, transcript, adapters, speed, pause_ms,
                              index_settings, finish, do_qc, progress)
+
+
+def index_history_audio(value):
+    source = Path(value or "")
+    if not source.is_file():
+        raise ValueError("旧版记录里的参考音频已找不到。请在旧版用原录音重新生成一次。")
+    try:
+        sf.info(source)
+    except (OSError, RuntimeError) as error:
+        raise ValueError("旧版记录里的参考音频无法读取。") from error
+    with source.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()[:24]
+    folder = OUT / "_index_refs"
+    folder.mkdir(exist_ok=True)
+    destination = folder / f"{digest}{source.suffix.lower()}"
+    if not destination.is_file():
+        pending = folder / f".{uuid4().hex}.tmp"
+        try:
+            shutil.copyfile(source, pending)
+            pending.replace(destination)
+        finally:
+            pending.unlink(missing_ok=True)
+    return str(destination)
+
+
+def load_index_history():
+    folder = Path(INDEX_HISTORY) if INDEX_HISTORY else None
+    record = max((file for file in folder.glob("*.json") if file.with_suffix(".wav").is_file()),
+                 key=lambda file: file.stat().st_mtime, default=None) if folder else None
+    if record is None:
+        raise gr.Error("找不到旧版已生成的配音记录。")
+    try:
+        data = json.loads(record.read_text(encoding="utf-8-sig"))
+        speaker = data["speaker"]
+        if speaker != "__none__" and not speakers().get(speaker, {}).get("adapters", {}).get(dubbing.INDEX):
+            raise ValueError("新版找不到这条记录使用的 IndexTTS 说话人。")
+        language = languages.NAMES[data["lang"]]
+        if language not in engine.LANGS:
+            raise ValueError("这条记录的语言不在 IndexTTS 支持范围内。")
+        method = data["emo_method"]
+        if method not in EMO_CHOICES:
+            raise ValueError("旧版记录里的情感设置无法识别。")
+        emo = index_history_audio(data["emo_ref"]) if method == engine.EMO_REF else None
+        reference = index_history_audio(data["ref"])
+        return (dubbing.INDEX, data["text"], gr.update(choices=language_choices(dubbing.INDEX), value=language),
+                speaker, gr.update(choices=preset_choices(speaker), value="自定义"), reference, method,
+                gr.update(visible=bool(emo), value=emo), data["emo_weight"], data["speed"], data["pause_ms"],
+                data["temperature"], data["top_p"], data["top_k"], data["num_beams"],
+                data["repetition_penalty"], data["diffusion_steps"], data["max_text_tokens"],
+                gr.update(visible=True, open=bool(emo)),
+                "已载入 7860 旧版最近一次配音的原文、参考录音、说话人和生成参数。")
+    except (KeyError, OSError, ValueError) as error:
+        raise gr.Error(f"无法载入旧版配音。{error}") from error
 
 
 # --------------------------------------------------------- 真人开头 + AI --
@@ -571,6 +642,8 @@ def build():
                                               placeholder="在这里输入要朗读的文案…", elem_id="studio-script")
                             lang = gr.Dropdown(language_choices(dubbing.AUTO), value=AUTO_LANGUAGE, label="文案语言",
                                                elem_classes="script-language")
+                            if INDEX_HISTORY:
+                                load_index = gr.Button("载入 7860 上次配音", size="sm")
                         with gr.Column(elem_classes="studio-card"):
                             card_heading("生成设置", "语速倍率越大，读得越慢。")
                             with gr.Row(elem_classes="settings-row"):
@@ -613,10 +686,15 @@ def build():
                             tts_status = gr.Markdown(elem_classes="studio-generation-status")
                 tts_results = result_players("配音成品", "tts-results")
 
-                spk.change(on_spk_change, spk, preset)
                 preset_fields = [ref, emo_method, emo_ref, emo_w, speed, pause, temp, emotion]
-                preset.change(on_preset, [spk, preset], preset_fields)
+                spk.input(on_spk_change, spk, preset).success(on_preset, [spk, preset], preset_fields)
+                preset.input(on_preset, [spk, preset], preset_fields)
                 demo.load(on_preset, [spk, preset], preset_fields)
+                if INDEX_HISTORY:
+                    load_index.click(load_index_history, outputs=[
+                        model, text, lang, spk, preset, ref, emo_method, emo_ref, emo_w, speed, pause, temp,
+                        top_p, top_k, beams, rep, steps, maxtok, emotion, tts_status,
+                    ], show_progress_on=tts_status)
                 emo_method.change(emotion_reference_visibility, emo_method, emo_ref, queue=False)
                 tts_engine_fields = [ref_transcript, emotion, sampling]
                 model.change(engine_language_fields, [model, lang], [lang, *tts_engine_fields], queue=False)
